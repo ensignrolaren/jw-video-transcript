@@ -66,7 +66,7 @@
   <ol>
     <li>Open any video page on jw.org — library URLs (<code>…/videos/#en/mediaitems/…/pub-xxx_VIDEO</code>), <code>/finder?lank=…</code> share links, article pages with a download dropdown, and news-release pages (which carry only a <code>docid</code>).</li>
     <li>Click the bookmark. It reads the LANK from the URL, hits the mediator API, downloads the VTT, strips timestamps/cue numbers/tags, dedupes rollup lines, and copies the result.</li>
-    <li>An alert confirms how many lines were copied. If the API reports no subtitle track, you'll get a "no subtitles" alert — that's your cue to fall back to whisper.</li>
+    <li>An alert confirms how many sentences were copied. The video's title lands on the first line, then a blank line, then the transcript. If the API reports no subtitle track, you'll get a "no subtitles" alert — that's your cue to fall back to whisper.</li>
   </ol>
 
   <h2>Notes</h2>
@@ -74,28 +74,27 @@
     <li><strong>Language:</strong> uses the <code>wtlocale</code> URL param when present, otherwise maps the page's <code>&lt;html lang&gt;</code> (en→E, es→S, fr→F, de→X, pt→T, it→I), defaulting to <code>E</code>. Edit the <code>M</code> map in the code to add locales.</li>
     <li><strong>Scope:</strong> must be run on a jw.org page (same-origin-ish context for fetch + a focused document for the Clipboard API). There's an <code>execCommand</code> fallback if <code>navigator.clipboard</code> is blocked.</li>
     <li><strong>Output:</strong> one <em>sentence</em> per line. Caption fragments are joined and re-split on sentence-ending punctuation; abbreviations (<code>Dr.</code>, <code>a.m.</code>, <code>e.g.</code>) and initials are shielded from false breaks, and hyphen-split words are rejoined. Rollup duplicates and HTML tags are removed.</li>
-    <li><strong>No-subtitles fallback:</strong> when the API has no subtitle track, the bookmarklet instead copies a <code>jwt '&lt;mp4-url&gt;'</code> command to your clipboard. Paste it into Terminal to download the smallest MP4 and transcribe it with mlx-whisper; the transcript is put on your clipboard via <code>pbcopy</code>. Requires the shell function below in your <code>~/.zshrc</code> and a working <code>mlx_whisper</code> install.</li>
+    <li><strong>No-subtitles fallback:</strong> when the API has no subtitle track, the bookmarklet instead copies a <code>jwt '&lt;mp4-url&gt;' '&lt;title&gt;'</code> command to your clipboard. Paste it into Terminal to download the smallest MP4 and transcribe it with mlx-whisper; the result is reflowed to one sentence per line and put on your clipboard via <code>pbcopy</code>.</li>
   </ul>
-  <pre>jwt() {
-  local tmp; tmp=$(mktemp -d)
-  echo "Downloading..."
-  curl -sL "$1" -o "$tmp/v.mp4" || { echo "download failed"; return 1; }
-  mlx_whisper "$tmp/v.mp4" --model mlx-community/whisper-small.en-mlx \
-    --output-format txt --output-dir "$tmp"
-  pbcopy &lt; "$tmp/v.txt" &amp;&amp; echo "Transcript copied to clipboard."
-  rm -rf "$tmp"
-}</pre>
+
+  <h2>Whisper fallback setup</h2>
+  <p>Only needed for videos with no subtitle track. Requires <a href="https://brew.sh">Homebrew</a> and macOS.</p>
+  <pre>brew install pipx &amp;&amp; pipx ensurepath
+pipx install mlx-whisper</pre>
+  <p>Then source the shell function from your <code>~/.zshrc</code>:</p>
+  <pre>source ~/path/to/jw-video-transcript/jwt.sh</pre>
+  <p class="hint">Source it — don't paste the function body into <code>~/.zshrc</code>. <code>jwt.sh</code> looks for <code>reflow.py</code> next to itself, and a pasted copy won't find it (or pick up later fixes). If you must paste, set <code>JWT_REFLOW</code> to the full path of <code>reflow.py</code>.</p>
 
   <h2>Readable source</h2>
   <pre id="pretty"></pre>
 </main>
 
 <script type="text/plain" id="bm">
-javascript:(async()=>{const h=location.href;const u=new URL(h);let k=u.searchParams.get('lank');let L=u.searchParams.get('wtlocale');let P=null;if(!k){const m=h.match(/((?:pub|docid)-[A-Za-z0-9_-]+_VIDEO)/i);if(m)k=m[1];}if(!k){const dv=document.querySelector('[data-video]');if(dv){const q=new URLSearchParams(((dv.getAttribute('data-video')||'').split('?')[1]||''));const p=q.get('pub'),dc=q.get('docid'),tr=q.get('track');if(p)k='pub-'+p+(tr?'_'+parseInt(tr,10):'')+'_VIDEO';else if(dc)k='docid-'+dc+'_'+(tr?parseInt(tr,10):1)+'_VIDEO';}}if(!k){for(const a of document.querySelectorAll('a[href*="jw-cdn.org"]')){const m2=a.href.match(/\/([A-Za-z0-9-]+)_([A-Z0-9]+)((?:_\d+)*)_r\d+P\.mp4/);if(m2){const g=m2[3].split('_').filter(Boolean);let t='';if(g.length){const tr=parseInt(g.pop(),10);t=(g.length?'_'+g.join('_'):'')+'_'+tr;}k='pub-'+m2[1]+t+'_VIDEO';if(!L)L=m2[2];break;}}}if(!k){const pa=document.querySelector('a[href*="GETPUBMEDIALINKS"]');if(pa){const q=new URLSearchParams(pa.href.split('?')[1]||'');const dc=q.get('docid'),p=q.get('pub'),tr=parseInt(q.get('track')||'1',10),lw=q.get('langwritten');if(!L&&lw)L=lw;if(p)k='pub-'+p+'_'+tr+'_VIDEO';else if(dc)k='docid-'+dc+'_'+tr+'_VIDEO';if(k)P={d:dc,p:p,t:tr,l:lw||L||'E'};}}if(!k){let dc=null;const og=document.querySelector('meta[property="og:image"]');let m3=og&&(og.content||'').match(/\/img\/p\/(\d{6,})\//);if(m3)dc=m3[1];if(!dc){const cl=document.querySelector('a[href*="choose-language"][href*="docid="]');if(cl)dc=new URLSearchParams(cl.href.split('?')[1]||'').get('docid');}if(!dc){m3=document.documentElement.innerHTML.match(/[?&]docid=(\d{6,})/);if(m3)dc=m3[1];}if(dc){k='docid-'+dc+'_1_VIDEO';P={d:dc,p:null,t:1,l:L||'E'};}}if(!k){alert('No video ID (LANK) found in the URL or on this page.');return;}if(!L){const M={en:'E',es:'S',fr:'F',de:'X',pt:'T',it:'I'};L=M[(document.documentElement.lang||'en').slice(0,2)]||'E';}try{const r=await fetch('https://b.jw-cdn.org/apis/mediator/v1/media-items/'+L+'/'+k+'?clientType=www');const d=await r.json();let f=(d&&d.media&&d.media[0]&&d.media[0].files)||[];if(!f.length&&P){const pr=await fetch('https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json&fileformat=MP4&alllangs=0&track='+P.t+'&langwritten='+P.l+'&txtCMSLang='+P.l+(P.d?'&docid='+P.d:'&pub='+P.p));const pd=await pr.json();const arr=(pd&&pd.files&&pd.files[P.l]&&pd.files[P.l].MP4)||[];f=arr.map(x=>({subtitles:x.subtitles,progressiveDownloadURL:x.file&&x.file.url,filesize:x.filesize}));}let s=null;for(const x of f){if(x&&x.subtitles&&x.subtitles.url){s=x.subtitles.url;break;}}if(!s){let b=null;for(const x of f){if(x&&x.progressiveDownloadURL){if(!b||(x.filesize||9e15)<(b.filesize||9e15))b=x;}}if(!b){alert('No subtitles and no downloadable file found.');return;}const cmd="jwt '"+b.progressiveDownloadURL+"'";let ok2=false;try{await navigator.clipboard.writeText(cmd);ok2=true;}catch(e){const ta=document.createElement('textarea');ta.value=cmd;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok2=document.execCommand('copy');ta.remove();}alert(ok2?'No subtitles - copied a `jwt` terminal command to your clipboard instead. Paste it in Terminal to transcribe with whisper.':'No subtitles, and clipboard copy failed.');return;}const vtt=await(await fetch(s)).text();const out=[];let prev=null;for(const raw of vtt.split(/\r?\n/)){const t=raw.trim();if(!t||t.startsWith('WEBVTT')||t.indexOf('-->')>-1||/^\d+$/.test(t)||/^(NOTE|STYLE|REGION)/.test(t))continue;const c=t.replace(/<[^>]+>/g,'');if(c&&c!==prev){out.push(c);prev=c;}}let j='';for(const ln of out){j=j?(/-$/.test(j)?j+ln:j+' '+ln):ln;}j=j.replace(/\s+/g,' ').trim();j=j.replace(/\b(Mr|Mrs|Ms|Dr|St|Jr|Sr|Prof|Rev|vs|etc|approx|Fig|No|Vol|Ch|e\.g|i\.e|a\.m|p\.m|U\.S)\.(?=\s)/gi,m=>m.replace(/\./g,'\u0001'));j=j.replace(/\b([A-Z])\.(?=\s[A-Z])/g,'$1\u0001');const sen=j.split(/(?<=[.!?\u2026]["')\u2019\u201d\]]*)\s+(?=[\u201c"'(\[A-Z0-9])/).map(p=>p.replace(/\u0001/g,'.').trim()).filter(Boolean);const txt=sen.join('\n');let ok=false;try{await navigator.clipboard.writeText(txt);ok=true;}catch(e){const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove();}alert(ok?'Copied '+sen.length+' sentences to clipboard.':'Copy failed - check clipboard permissions.');}catch(e){alert('Error: '+e.message);}})();
+javascript:(async()=>{const h=location.href;const u=new URL(h);let k=u.searchParams.get('lank');let L=u.searchParams.get('wtlocale');let P=null;if(!k){const m=h.match(/((?:pub|docid)-[A-Za-z0-9_-]+_VIDEO)/i);if(m)k=m[1];}if(!k){const dv=document.querySelector('[data-video]');if(dv){const q=new URLSearchParams(((dv.getAttribute('data-video')||'').split('?')[1]||''));const p=q.get('pub'),dc=q.get('docid'),tr=q.get('track');if(p)k='pub-'+p+(tr?'_'+parseInt(tr,10):'')+'_VIDEO';else if(dc)k='docid-'+dc+'_'+(tr?parseInt(tr,10):1)+'_VIDEO';}}if(!k){for(const a of document.querySelectorAll('a[href*="jw-cdn.org"]')){const m2=a.href.match(/\/([A-Za-z0-9-]+)_([A-Z0-9]+)((?:_\d+)*)_r\d+P\.mp4/);if(m2){const g=m2[3].split('_').filter(Boolean);let t='';if(g.length){const tr=parseInt(g.pop(),10);t=(g.length?'_'+g.join('_'):'')+'_'+tr;}k='pub-'+m2[1]+t+'_VIDEO';if(!L)L=m2[2];break;}}}if(!k){const pa=document.querySelector('a[href*="GETPUBMEDIALINKS"]');if(pa){const q=new URLSearchParams(pa.href.split('?')[1]||'');const dc=q.get('docid'),p=q.get('pub'),tr=parseInt(q.get('track')||'1',10),lw=q.get('langwritten');if(!L&&lw)L=lw;if(p)k='pub-'+p+'_'+tr+'_VIDEO';else if(dc)k='docid-'+dc+'_'+tr+'_VIDEO';if(k)P={d:dc,p:p,t:tr,l:lw||L||'E'};}}if(!k){let dc=null;const og=document.querySelector('meta[property="og:image"]');let m3=og&&(og.content||'').match(/\/img\/p\/(\d{6,})\//);if(m3)dc=m3[1];if(!dc){const cl=document.querySelector('a[href*="choose-language"][href*="docid="]');if(cl)dc=new URLSearchParams(cl.href.split('?')[1]||'').get('docid');}if(!dc){m3=document.documentElement.innerHTML.match(/[?&]docid=(\d{6,})/);if(m3)dc=m3[1];}if(dc){k='docid-'+dc+'_1_VIDEO';P={d:dc,p:null,t:1,l:L||'E'};}}if(!k){alert('No video ID (LANK) found in the URL or on this page.');return;}if(!L){const M={en:'E',es:'S',fr:'F',de:'X',pt:'T',it:'I'};L=M[(document.documentElement.lang||'en').slice(0,2)]||'E';}try{const r=await fetch('https://b.jw-cdn.org/apis/mediator/v1/media-items/'+L+'/'+k+'?clientType=www');const d=await r.json();let f=(d&&d.media&&d.media[0]&&d.media[0].files)||[];let T=(d&&d.media&&d.media[0]&&d.media[0].title)||'';if(!f.length&&P){const pr=await fetch('https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json&fileformat=MP4&alllangs=0&track='+P.t+'&langwritten='+P.l+'&txtCMSLang='+P.l+(P.d?'&docid='+P.d:'&pub='+P.p));const pd=await pr.json();const arr=(pd&&pd.files&&pd.files[P.l]&&pd.files[P.l].MP4)||[];f=arr.map(x=>({subtitles:x.subtitles,progressiveDownloadURL:x.file&&x.file.url,filesize:x.filesize}));if(!T)T=(pd&&pd.pubName)||(arr[0]&&arr[0].title)||'';}T=T.replace(/[​-‍﻿]/g,'').replace(/\s+/g,' ').trim();let s=null;for(const x of f){if(x&&x.subtitles&&x.subtitles.url){s=x.subtitles.url;break;}}if(!s){let b=null;for(const x of f){if(x&&x.progressiveDownloadURL){if(!b||(x.filesize||9e15)<(b.filesize||9e15))b=x;}}if(!b){alert('No subtitles and no downloadable file found.');return;}const shq=s=>"'"+String(s).replace(/'/g,"'\\''")+"'";const cmd="jwt "+shq(b.progressiveDownloadURL)+(T?' '+shq(T):'');let ok2=false;try{await navigator.clipboard.writeText(cmd);ok2=true;}catch(e){const ta=document.createElement('textarea');ta.value=cmd;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok2=document.execCommand('copy');ta.remove();}alert(ok2?'No subtitles - copied a `jwt` terminal command to your clipboard instead. Paste it in Terminal to transcribe with whisper.':'No subtitles, and clipboard copy failed.');return;}const vtt=await(await fetch(s)).text();const out=[];let prev=null;for(const raw of vtt.split(/\r?\n/)){const t=raw.trim();if(!t||t.startsWith('WEBVTT')||t.indexOf('-->')>-1||/^\d+$/.test(t)||/^(NOTE|STYLE|REGION)/.test(t))continue;const c=t.replace(/<[^>]+>/g,'');if(c&&c!==prev){out.push(c);prev=c;}}let j='';for(const ln of out){j=j?(/-$/.test(j)?j+ln:j+' '+ln):ln;}j=j.replace(/\s+/g,' ').trim();j=j.replace(/\b(Mr|Mrs|Ms|Dr|St|Jr|Sr|Prof|Rev|vs|etc|approx|Fig|No|Vol|Ch|e\.g|i\.e|a\.m|p\.m|U\.S)\.(?=\s)/gi,m=>m.replace(/\./g,'\u0001'));j=j.replace(/\b([A-Z])\.(?=\s[A-Z])/g,'$1\u0001');const sen=j.split(/(?<=[.!?\u2026]["')\u2019\u201d\]]*)\s+(?=[\u201c"'(\[A-Z0-9])/).map(p=>p.replace(/\u0001/g,'.').trim()).filter(Boolean);const txt=(T?T+'\n\n':'')+sen.join('\n');let ok=false;try{await navigator.clipboard.writeText(txt);ok=true;}catch(e){const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove();}alert(ok?'Copied '+sen.length+' sentences to clipboard.':'Copy failed - check clipboard permissions.');}catch(e){alert('Error: '+e.message);}})();
 </script>
 
 <script type="text/plain" id="src">
-// jw-transcript — readable source
+// jw-video-transcript — readable source
 //
 // Minify this (or copy bookmarklet.js) and save it as a bookmark URL.
 // Run it on a jw.org video page. If a subtitle track exists, the transcript
@@ -216,6 +215,7 @@ javascript:(async () => {
                           + locale + '/' + lank + '?clientType=www');
     const d = await r.json();
     let files = (d && d.media && d.media[0] && d.media[0].files) || [];
+    let title = (d && d.media && d.media[0] && d.media[0].title) || '';
 
     // Mediator doesn't always have an entry for docid-style items. When we
     // read the params off a pub-media link, ask that API instead and
@@ -232,7 +232,11 @@ javascript:(async () => {
         progressiveDownloadURL: x.file && x.file.url,
         filesize: x.filesize
       }));
+      if (!title) title = (pd && pd.pubName) || (arr[0] && arr[0].title) || '';
     }
+
+    // Zero-width characters show up in some titles (e.g. before an em dash).
+    title = title.replace(/[​-‍﻿]/g, '').replace(/\s+/g, ' ').trim();
 
     let subUrl = null;
     for (const f of files) {
@@ -250,7 +254,10 @@ javascript:(async () => {
         }
       }
       if (!best) { alert('No subtitles and no downloadable file found.'); return; }
-      const cmd = "jwt '" + best.progressiveDownloadURL + "'";
+      // Single-quote for the shell; a literal ' becomes '\'' inside the quotes.
+      const shq = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
+      const cmd = "jwt " + shq(best.progressiveDownloadURL)
+                + (title ? ' ' + shq(title) : '');
       const ok2 = await copy(cmd);
       alert(ok2 ? 'No subtitles - copied a `jwt` terminal command to your clipboard instead. Paste it in Terminal to transcribe with whisper.'
                 : 'No subtitles, and clipboard copy failed.');
@@ -293,7 +300,7 @@ javascript:(async () => {
                  .map(p => p.replace(/\u0001/g, '.').trim())
                  .filter(Boolean);
 
-    const txt = sen.join('\n');
+    const txt = (title ? title + '\n\n' : '') + sen.join('\n');
     const ok = await copy(txt);
     alert(ok ? 'Copied ' + sen.length + ' sentences to clipboard.'
              : 'Copy failed - check clipboard permissions.');

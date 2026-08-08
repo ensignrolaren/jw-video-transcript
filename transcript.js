@@ -1,4 +1,4 @@
-// jw-transcript — readable source
+// jw-video-transcript — readable source
 //
 // Minify this (or copy bookmarklet.js) and save it as a bookmark URL.
 // Run it on a jw.org video page. If a subtitle track exists, the transcript
@@ -119,6 +119,7 @@ javascript:(async () => {
                           + locale + '/' + lank + '?clientType=www');
     const d = await r.json();
     let files = (d && d.media && d.media[0] && d.media[0].files) || [];
+    let title = (d && d.media && d.media[0] && d.media[0].title) || '';
 
     // Mediator doesn't always have an entry for docid-style items. When we
     // read the params off a pub-media link, ask that API instead and
@@ -135,7 +136,11 @@ javascript:(async () => {
         progressiveDownloadURL: x.file && x.file.url,
         filesize: x.filesize
       }));
+      if (!title) title = (pd && pd.pubName) || (arr[0] && arr[0].title) || '';
     }
+
+    // Zero-width characters show up in some titles (e.g. before an em dash).
+    title = title.replace(/[​-‍﻿]/g, '').replace(/\s+/g, ' ').trim();
 
     let subUrl = null;
     for (const f of files) {
@@ -153,7 +158,10 @@ javascript:(async () => {
         }
       }
       if (!best) { alert('No subtitles and no downloadable file found.'); return; }
-      const cmd = "jwt '" + best.progressiveDownloadURL + "'";
+      // Single-quote for the shell; a literal ' becomes '\'' inside the quotes.
+      const shq = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
+      const cmd = "jwt " + shq(best.progressiveDownloadURL)
+                + (title ? ' ' + shq(title) : '');
       const ok2 = await copy(cmd);
       alert(ok2 ? 'No subtitles - copied a `jwt` terminal command to your clipboard instead. Paste it in Terminal to transcribe with whisper.'
                 : 'No subtitles, and clipboard copy failed.');
@@ -196,7 +204,7 @@ javascript:(async () => {
                  .map(p => p.replace(/\u0001/g, '.').trim())
                  .filter(Boolean);
 
-    const txt = sen.join('\n');
+    const txt = (title ? title + '\n\n' : '') + sen.join('\n');
     const ok = await copy(txt);
     alert(ok ? 'Copied ' + sen.length + ' sentences to clipboard.'
              : 'Copy failed - check clipboard permissions.');

@@ -3,3 +3,5 @@
 *.mp4
 *.txt
 !README*.txt
+__pycache__/
+*.pyc
