@@ -15,6 +15,7 @@ javascript:(async () => {
   // ---------------------------------------------------------------------
   let lank = u.searchParams.get('lank');
   let locale = u.searchParams.get('wtlocale');
+  let pm = null;   // pub-media params, if we had to read them off the page
 
   // Share links and library hash URLs carry the LANK directly
   if (!lank) {
@@ -54,6 +55,55 @@ javascript:(async () => {
     }
   }
 
+  // Fallback 3: news-article pages carry no LANK, but their play/download
+  // links point at the pub-media API with a docid and track:
+  //   GETPUBMEDIALINKS?docid=1112024059&track=1&langwritten=E
+  //   -> docid-1112024059_1_VIDEO
+  if (!lank) {
+    const pa = document.querySelector('a[href*="GETPUBMEDIALINKS"]');
+    if (pa) {
+      const q = new URLSearchParams(pa.href.split('?')[1] || '');
+      const docid = q.get('docid'), pub = q.get('pub');
+      const track = parseInt(q.get('track') || '1', 10);
+      const lw = q.get('langwritten');
+      if (!locale && lw) locale = lw;
+      if (pub)        lank = 'pub-' + pub + '_' + track + '_VIDEO';
+      else if (docid) lank = 'docid-' + docid + '_' + track + '_VIDEO';
+      // keep the params around: pub-media can answer directly if mediator can't
+      if (lank) pm = { docid: docid, pub: pub, track: track, lang: lw || locale || 'E' };
+    }
+  }
+
+  // Fallback 4: news pages where the player has already replaced the download
+  // links by the time the bookmarklet runs. The docid still survives in markup
+  // the player doesn't touch:
+  //   <meta property="og:image"> -> .../img/p/1112024059/univ/art/...
+  //   language picker link       -> /choose-language?...&docid=1112024059
+  // Neither carries a track number, so assume 1.
+  if (!lank) {
+    let docid = null;
+
+    const og = document.querySelector('meta[property="og:image"]');
+    let m3 = og && (og.content || '').match(/\/img\/p\/(\d{6,})\//);
+    if (m3) docid = m3[1];
+
+    if (!docid) {
+      const cl = document.querySelector('a[href*="choose-language"][href*="docid="]');
+      if (cl) docid = new URLSearchParams(cl.href.split('?')[1] || '').get('docid');
+    }
+
+    // last resort: any docid anywhere in the page source
+    if (!docid) {
+      m3 = document.documentElement.innerHTML.match(/[?&]docid=(\d{6,})/);
+      if (m3) docid = m3[1];
+    }
+
+    if (docid) {
+      lank = 'docid-' + docid + '_1_VIDEO';
+      pm = { docid: docid, pub: null, track: 1, lang: locale || 'E' };
+    }
+  }
+
   if (!lank) { alert('No video ID (LANK) found in the URL or on this page.'); return; }
 
   if (!locale) {
@@ -68,7 +118,24 @@ javascript:(async () => {
     const r = await fetch('https://b.jw-cdn.org/apis/mediator/v1/media-items/'
                           + locale + '/' + lank + '?clientType=www');
     const d = await r.json();
-    const files = (d && d.media && d.media[0] && d.media[0].files) || [];
+    let files = (d && d.media && d.media[0] && d.media[0].files) || [];
+
+    // Mediator doesn't always have an entry for docid-style items. When we
+    // read the params off a pub-media link, ask that API instead and
+    // normalize its shape to match ({ subtitles, progressiveDownloadURL }).
+    if (!files.length && pm) {
+      const pr = await fetch('https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json'
+        + '&fileformat=MP4&alllangs=0&track=' + pm.track
+        + '&langwritten=' + pm.lang + '&txtCMSLang=' + pm.lang
+        + (pm.docid ? '&docid=' + pm.docid : '&pub=' + pm.pub));
+      const pd = await pr.json();
+      const arr = (pd && pd.files && pd.files[pm.lang] && pd.files[pm.lang].MP4) || [];
+      files = arr.map(x => ({
+        subtitles: x.subtitles,
+        progressiveDownloadURL: x.file && x.file.url,
+        filesize: x.filesize
+      }));
+    }
 
     let subUrl = null;
     for (const f of files) {

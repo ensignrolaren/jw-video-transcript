@@ -11,13 +11,16 @@ reflows it.
 ## How it works
 
 1. Determines the video's LANK (its `pub-…_VIDEO` identifier) from the page URL,
-   the embedded player markup, or a download link on the page.
+   the embedded player markup, a jw-cdn download link, or the `docid`/`track`
+   parameters on a `GETPUBMEDIALINKS` play/download link (news-release pages).
 2. Queries the public mediator API:
    `https://b.jw-cdn.org/apis/mediator/v1/media-items/{LANG}/{LANK}?clientType=www`
-3. If a subtitle URL is present, fetches the VTT, strips cue numbers, timestamps
+3. If the mediator has no entry (some `docid`-style items), falls back to the
+   pub-media API: `GETPUBMEDIALINKS?output=json&fileformat=MP4&docid=…&track=…`
+4. If a subtitle URL is present, fetches the VTT, strips cue numbers, timestamps
    and markup, dedupes rollup captions, reflows the fragments into sentences,
    and copies the result.
-4. If there's no subtitle track, copies a `jwt '<mp4-url>'` command instead,
+5. If there's no subtitle track, copies a `jwt '<mp4-url>'` command instead,
    pointed at the smallest available MP4 (the audio track is identical at every
    resolution).
 
@@ -73,7 +76,9 @@ JWT_MODEL=mlx-community/whisper-medium.en-mlx jwt <url>
 - **Scope.** Must be run from a jw.org page — the Clipboard API needs a focused
   document and a user gesture.
 - **Multiple videos on one page.** When the LANK isn't in the URL, the first
-  matching MP4 link in DOM order wins.
+  matching link in DOM order wins.
+- **Page types.** Library video pages, `finder` share links, article pages with a
+  download dropdown, and news releases are all handled.
 
 ## Files
 

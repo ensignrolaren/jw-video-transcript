@@ -64,7 +64,7 @@
 
   <h2>Use</h2>
   <ol>
-    <li>Open any video page on jw.org — works with both <code>/finder?lank=…</code> share links and library URLs like <code>…/videos/#en/mediaitems/…/pub-xxx_VIDEO</code>.</li>
+    <li>Open any video page on jw.org — library URLs (<code>…/videos/#en/mediaitems/…/pub-xxx_VIDEO</code>), <code>/finder?lank=…</code> share links, article pages with a download dropdown, and news-release pages (which carry only a <code>docid</code>).</li>
     <li>Click the bookmark. It reads the LANK from the URL, hits the mediator API, downloads the VTT, strips timestamps/cue numbers/tags, dedupes rollup lines, and copies the result.</li>
     <li>An alert confirms how many lines were copied. If the API reports no subtitle track, you'll get a "no subtitles" alert — that's your cue to fall back to whisper.</li>
   </ol>
@@ -91,7 +91,7 @@
 </main>
 
 <script type="text/plain" id="bm">
-javascript:(async()=>{const h=location.href;const u=new URL(h);let k=u.searchParams.get('lank');let L=u.searchParams.get('wtlocale');if(!k){const m=h.match(/((?:pub|docid)-[A-Za-z0-9_-]+_VIDEO)/i);if(m)k=m[1];}if(!k){const dv=document.querySelector('[data-video]');if(dv){const q=new URLSearchParams(((dv.getAttribute('data-video')||'').split('?')[1]||''));const p=q.get('pub'),dc=q.get('docid'),tr=q.get('track');if(p)k='pub-'+p+(tr?'_'+parseInt(tr,10):'')+'_VIDEO';else if(dc)k='docid-'+dc+'_'+(tr?parseInt(tr,10):1)+'_VIDEO';}}if(!k){for(const a of document.querySelectorAll('a[href*="jw-cdn.org"]')){const m2=a.href.match(/\/([A-Za-z0-9-]+)_([A-Z0-9]+)((?:_\d+)*)_r\d+P\.mp4/);if(m2){const g=m2[3].split('_').filter(Boolean);let t='';if(g.length){const tr=parseInt(g.pop(),10);t=(g.length?'_'+g.join('_'):'')+'_'+tr;}k='pub-'+m2[1]+t+'_VIDEO';if(!L)L=m2[2];break;}}}if(!k){alert('No video ID (LANK) found in the URL or on this page.');return;}if(!L){const M={en:'E',es:'S',fr:'F',de:'X',pt:'T',it:'I'};L=M[(document.documentElement.lang||'en').slice(0,2)]||'E';}try{const r=await fetch('https://b.jw-cdn.org/apis/mediator/v1/media-items/'+L+'/'+k+'?clientType=www');const d=await r.json();const f=(d&&d.media&&d.media[0]&&d.media[0].files)||[];let s=null;for(const x of f){if(x&&x.subtitles&&x.subtitles.url){s=x.subtitles.url;break;}}if(!s){let b=null;for(const x of f){if(x&&x.progressiveDownloadURL){if(!b||(x.filesize||9e15)<(b.filesize||9e15))b=x;}}if(!b){alert('No subtitles and no downloadable file found.');return;}const cmd="jwt '"+b.progressiveDownloadURL+"'";let ok2=false;try{await navigator.clipboard.writeText(cmd);ok2=true;}catch(e){const ta=document.createElement('textarea');ta.value=cmd;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok2=document.execCommand('copy');ta.remove();}alert(ok2?'No subtitles - copied a `jwt` terminal command to your clipboard instead. Paste it in Terminal to transcribe with whisper.':'No subtitles, and clipboard copy failed.');return;}const vtt=await(await fetch(s)).text();const out=[];let prev=null;for(const raw of vtt.split(/\r?\n/)){const t=raw.trim();if(!t||t.startsWith('WEBVTT')||t.indexOf('-->')>-1||/^\d+$/.test(t)||/^(NOTE|STYLE|REGION)/.test(t))continue;const c=t.replace(/<[^>]+>/g,'');if(c&&c!==prev){out.push(c);prev=c;}}let j='';for(const ln of out){j=j?(/-$/.test(j)?j+ln:j+' '+ln):ln;}j=j.replace(/\s+/g,' ').trim();j=j.replace(/\b(Mr|Mrs|Ms|Dr|St|Jr|Sr|Prof|Rev|vs|etc|approx|Fig|No|Vol|Ch|e\.g|i\.e|a\.m|p\.m|U\.S)\.(?=\s)/gi,m=>m.replace(/\./g,'\u0001'));j=j.replace(/\b([A-Z])\.(?=\s[A-Z])/g,'$1\u0001');const sen=j.split(/(?<=[.!?\u2026]["')\u2019\u201d\]]*)\s+(?=[\u201c"'(\[A-Z0-9])/).map(p=>p.replace(/\u0001/g,'.').trim()).filter(Boolean);const txt=sen.join('\n');let ok=false;try{await navigator.clipboard.writeText(txt);ok=true;}catch(e){const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove();}alert(ok?'Copied '+sen.length+' sentences to clipboard.':'Copy failed - check clipboard permissions.');}catch(e){alert('Error: '+e.message);}})();
+javascript:(async()=>{const h=location.href;const u=new URL(h);let k=u.searchParams.get('lank');let L=u.searchParams.get('wtlocale');let P=null;if(!k){const m=h.match(/((?:pub|docid)-[A-Za-z0-9_-]+_VIDEO)/i);if(m)k=m[1];}if(!k){const dv=document.querySelector('[data-video]');if(dv){const q=new URLSearchParams(((dv.getAttribute('data-video')||'').split('?')[1]||''));const p=q.get('pub'),dc=q.get('docid'),tr=q.get('track');if(p)k='pub-'+p+(tr?'_'+parseInt(tr,10):'')+'_VIDEO';else if(dc)k='docid-'+dc+'_'+(tr?parseInt(tr,10):1)+'_VIDEO';}}if(!k){for(const a of document.querySelectorAll('a[href*="jw-cdn.org"]')){const m2=a.href.match(/\/([A-Za-z0-9-]+)_([A-Z0-9]+)((?:_\d+)*)_r\d+P\.mp4/);if(m2){const g=m2[3].split('_').filter(Boolean);let t='';if(g.length){const tr=parseInt(g.pop(),10);t=(g.length?'_'+g.join('_'):'')+'_'+tr;}k='pub-'+m2[1]+t+'_VIDEO';if(!L)L=m2[2];break;}}}if(!k){const pa=document.querySelector('a[href*="GETPUBMEDIALINKS"]');if(pa){const q=new URLSearchParams(pa.href.split('?')[1]||'');const dc=q.get('docid'),p=q.get('pub'),tr=parseInt(q.get('track')||'1',10),lw=q.get('langwritten');if(!L&&lw)L=lw;if(p)k='pub-'+p+'_'+tr+'_VIDEO';else if(dc)k='docid-'+dc+'_'+tr+'_VIDEO';if(k)P={d:dc,p:p,t:tr,l:lw||L||'E'};}}if(!k){let dc=null;const og=document.querySelector('meta[property="og:image"]');let m3=og&&(og.content||'').match(/\/img\/p\/(\d{6,})\//);if(m3)dc=m3[1];if(!dc){const cl=document.querySelector('a[href*="choose-language"][href*="docid="]');if(cl)dc=new URLSearchParams(cl.href.split('?')[1]||'').get('docid');}if(!dc){m3=document.documentElement.innerHTML.match(/[?&]docid=(\d{6,})/);if(m3)dc=m3[1];}if(dc){k='docid-'+dc+'_1_VIDEO';P={d:dc,p:null,t:1,l:L||'E'};}}if(!k){alert('No video ID (LANK) found in the URL or on this page.');return;}if(!L){const M={en:'E',es:'S',fr:'F',de:'X',pt:'T',it:'I'};L=M[(document.documentElement.lang||'en').slice(0,2)]||'E';}try{const r=await fetch('https://b.jw-cdn.org/apis/mediator/v1/media-items/'+L+'/'+k+'?clientType=www');const d=await r.json();let f=(d&&d.media&&d.media[0]&&d.media[0].files)||[];if(!f.length&&P){const pr=await fetch('https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json&fileformat=MP4&alllangs=0&track='+P.t+'&langwritten='+P.l+'&txtCMSLang='+P.l+(P.d?'&docid='+P.d:'&pub='+P.p));const pd=await pr.json();const arr=(pd&&pd.files&&pd.files[P.l]&&pd.files[P.l].MP4)||[];f=arr.map(x=>({subtitles:x.subtitles,progressiveDownloadURL:x.file&&x.file.url,filesize:x.filesize}));}let s=null;for(const x of f){if(x&&x.subtitles&&x.subtitles.url){s=x.subtitles.url;break;}}if(!s){let b=null;for(const x of f){if(x&&x.progressiveDownloadURL){if(!b||(x.filesize||9e15)<(b.filesize||9e15))b=x;}}if(!b){alert('No subtitles and no downloadable file found.');return;}const cmd="jwt '"+b.progressiveDownloadURL+"'";let ok2=false;try{await navigator.clipboard.writeText(cmd);ok2=true;}catch(e){const ta=document.createElement('textarea');ta.value=cmd;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok2=document.execCommand('copy');ta.remove();}alert(ok2?'No subtitles - copied a `jwt` terminal command to your clipboard instead. Paste it in Terminal to transcribe with whisper.':'No subtitles, and clipboard copy failed.');return;}const vtt=await(await fetch(s)).text();const out=[];let prev=null;for(const raw of vtt.split(/\r?\n/)){const t=raw.trim();if(!t||t.startsWith('WEBVTT')||t.indexOf('-->')>-1||/^\d+$/.test(t)||/^(NOTE|STYLE|REGION)/.test(t))continue;const c=t.replace(/<[^>]+>/g,'');if(c&&c!==prev){out.push(c);prev=c;}}let j='';for(const ln of out){j=j?(/-$/.test(j)?j+ln:j+' '+ln):ln;}j=j.replace(/\s+/g,' ').trim();j=j.replace(/\b(Mr|Mrs|Ms|Dr|St|Jr|Sr|Prof|Rev|vs|etc|approx|Fig|No|Vol|Ch|e\.g|i\.e|a\.m|p\.m|U\.S)\.(?=\s)/gi,m=>m.replace(/\./g,'\u0001'));j=j.replace(/\b([A-Z])\.(?=\s[A-Z])/g,'$1\u0001');const sen=j.split(/(?<=[.!?\u2026]["')\u2019\u201d\]]*)\s+(?=[\u201c"'(\[A-Z0-9])/).map(p=>p.replace(/\u0001/g,'.').trim()).filter(Boolean);const txt=sen.join('\n');let ok=false;try{await navigator.clipboard.writeText(txt);ok=true;}catch(e){const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove();}alert(ok?'Copied '+sen.length+' sentences to clipboard.':'Copy failed - check clipboard permissions.');}catch(e){alert('Error: '+e.message);}})();
 </script>
 
 <script type="text/plain" id="src">
@@ -112,6 +112,7 @@ javascript:(async () => {
   // ---------------------------------------------------------------------
   let lank = u.searchParams.get('lank');
   let locale = u.searchParams.get('wtlocale');
+  let pm = null;   // pub-media params, if we had to read them off the page
 
   // Share links and library hash URLs carry the LANK directly
   if (!lank) {
@@ -151,6 +152,55 @@ javascript:(async () => {
     }
   }
 
+  // Fallback 3: news-article pages carry no LANK, but their play/download
+  // links point at the pub-media API with a docid and track:
+  //   GETPUBMEDIALINKS?docid=1112024059&track=1&langwritten=E
+  //   -> docid-1112024059_1_VIDEO
+  if (!lank) {
+    const pa = document.querySelector('a[href*="GETPUBMEDIALINKS"]');
+    if (pa) {
+      const q = new URLSearchParams(pa.href.split('?')[1] || '');
+      const docid = q.get('docid'), pub = q.get('pub');
+      const track = parseInt(q.get('track') || '1', 10);
+      const lw = q.get('langwritten');
+      if (!locale && lw) locale = lw;
+      if (pub)        lank = 'pub-' + pub + '_' + track + '_VIDEO';
+      else if (docid) lank = 'docid-' + docid + '_' + track + '_VIDEO';
+      // keep the params around: pub-media can answer directly if mediator can't
+      if (lank) pm = { docid: docid, pub: pub, track: track, lang: lw || locale || 'E' };
+    }
+  }
+
+  // Fallback 4: news pages where the player has already replaced the download
+  // links by the time the bookmarklet runs. The docid still survives in markup
+  // the player doesn't touch:
+  //   <meta property="og:image"> -> .../img/p/1112024059/univ/art/...
+  //   language picker link       -> /choose-language?...&docid=1112024059
+  // Neither carries a track number, so assume 1.
+  if (!lank) {
+    let docid = null;
+
+    const og = document.querySelector('meta[property="og:image"]');
+    let m3 = og && (og.content || '').match(/\/img\/p\/(\d{6,})\//);
+    if (m3) docid = m3[1];
+
+    if (!docid) {
+      const cl = document.querySelector('a[href*="choose-language"][href*="docid="]');
+      if (cl) docid = new URLSearchParams(cl.href.split('?')[1] || '').get('docid');
+    }
+
+    // last resort: any docid anywhere in the page source
+    if (!docid) {
+      m3 = document.documentElement.innerHTML.match(/[?&]docid=(\d{6,})/);
+      if (m3) docid = m3[1];
+    }
+
+    if (docid) {
+      lank = 'docid-' + docid + '_1_VIDEO';
+      pm = { docid: docid, pub: null, track: 1, lang: locale || 'E' };
+    }
+  }
+
   if (!lank) { alert('No video ID (LANK) found in the URL or on this page.'); return; }
 
   if (!locale) {
@@ -165,7 +215,24 @@ javascript:(async () => {
     const r = await fetch('https://b.jw-cdn.org/apis/mediator/v1/media-items/'
                           + locale + '/' + lank + '?clientType=www');
     const d = await r.json();
-    const files = (d && d.media && d.media[0] && d.media[0].files) || [];
+    let files = (d && d.media && d.media[0] && d.media[0].files) || [];
+
+    // Mediator doesn't always have an entry for docid-style items. When we
+    // read the params off a pub-media link, ask that API instead and
+    // normalize its shape to match ({ subtitles, progressiveDownloadURL }).
+    if (!files.length && pm) {
+      const pr = await fetch('https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json'
+        + '&fileformat=MP4&alllangs=0&track=' + pm.track
+        + '&langwritten=' + pm.lang + '&txtCMSLang=' + pm.lang
+        + (pm.docid ? '&docid=' + pm.docid : '&pub=' + pm.pub));
+      const pd = await pr.json();
+      const arr = (pd && pd.files && pd.files[pm.lang] && pd.files[pm.lang].MP4) || [];
+      files = arr.map(x => ({
+        subtitles: x.subtitles,
+        progressiveDownloadURL: x.file && x.file.url,
+        filesize: x.filesize
+      }));
+    }
 
     let subUrl = null;
     for (const f of files) {
