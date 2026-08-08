@@ -1,0 +1,5 @@
+.DS_Store
+*.vtt
+*.mp4
+*.txt
+!README*.txt
