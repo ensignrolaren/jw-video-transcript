@@ -11,7 +11,7 @@ reflows it.
 ## How it works
 
 1. Determines the video's LANK (its `pub-…_VIDEO` identifier) from the page URL,
-   the embedded player markup, a jw-cdn download link, the `docid`/`track`
+   the embedded player markup (including WOL’s `video[data-json-src]`), a jw-cdn download link, the `docid`/`track`
    parameters on a `GETPUBMEDIALINKS` play/download link, or — on news releases,
    where the player replaces those links once it loads — the `docid` in the
    `og:image` URL or the `choose-language` link.
@@ -54,6 +54,9 @@ it. If you'd rather paste the function straight into `~/.zshrc`, point
 ```sh
 export JWT_REFLOW=~/path/to/jw-video-transcript/reflow.py
 ```
+
+After updating the code, replace your existing bookmark using `install.html` to
+pick up the new detection logic.
 
 ## Usage
 
@@ -109,7 +112,8 @@ pbpaste | python3 reflow.py --title 'Video Title' | pbcopy
 - **Multiple videos on one page.** When the LANK isn't in the URL, the first
   matching link in DOM order wins.
 - **Page types.** Library video pages, `finder` share links, article pages with a
-  download dropdown, and news releases are all handled.
+  download dropdown, news releases, and Watchtower ONLINE LIBRARY Bible introduction videos
+  (`wol.jw.org`) are all handled.
 
 ## Files
 

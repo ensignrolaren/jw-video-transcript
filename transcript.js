@@ -23,14 +23,21 @@ javascript:(async () => {
     if (m) lank = m[1];
   }
 
-  // Fallback 1: embedded player markup, e.g. data-video="webpubvid://?pub=ljf&track=10"
+  // Fallback 1: embedded players on jw.org and Watchtower ONLINE LIBRARY.
+  // WOL uses data-json-src="/wol/vidlink/r1/lp-e?pub=nwtsv&track=090".
   if (!lank) {
-    const dv = document.querySelector('[data-video]');
-    if (dv) {
-      const q = new URLSearchParams(((dv.getAttribute('data-video') || '').split('?')[1] || ''));
+    for (const dv of document.querySelectorAll('[data-video], video[data-json-src]')) {
+      const src = dv.getAttribute('data-video') || dv.getAttribute('data-json-src') || '';
+      const q = new URLSearchParams(src.split('?')[1] || '');
       const pub = q.get('pub'), docid = q.get('docid'), track = q.get('track');
       if (pub)        lank = 'pub-' + pub + (track ? '_' + parseInt(track, 10) : '') + '_VIDEO';
       else if (docid) lank = 'docid-' + docid + '_' + (track ? parseInt(track, 10) : 1) + '_VIDEO';
+      if (lank) {
+        const language = dv.closest('[data-lang]');
+        if (!locale) locale = q.get('langwritten') || q.get('wtlocale')
+          || (language && language.getAttribute('data-lang'));
+        break;
+      }
     }
   }
 
@@ -213,7 +220,6 @@ javascript:(async () => {
   }
 
   // Clipboard write with an execCommand fallback for restricted contexts.
-  // (Inlined twice in the minified build to keep it a single expression.)
   async function copy(text) {
     try { await navigator.clipboard.writeText(text); return true; }
     catch (e) {
