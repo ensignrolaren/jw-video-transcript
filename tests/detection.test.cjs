@@ -2,23 +2,35 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const { JSDOM } = require('jsdom');
 
 // Attribute values from the WOL 1 Samuel introduction, after HTML decoding.
 const wolSource = '/wol/vidlink/r1/lp-e?pub=nwtsv&track=090&style=chromeless';
-const player = (attributes, language = 'E') => ({
-  getAttribute: key => attributes[key] || null,
-  closest: () => ({ getAttribute: () => language })
-});
+const player = (attributes, language = 'E', tag = 'video') => {
+  const document = new JSDOM('<article></article>').window.document;
+  const article = document.querySelector('article');
+  article.setAttribute('data-lang', language);
+  const element = document.createElement(tag);
+  for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+  article.append(element);
+  return article.outerHTML;
+};
+function executable(build) {
+  let code;
+  if (build === 'installed bookmark') {
+    const dom = new JSDOM(fs.readFileSync('install.html', 'utf8'), { runScripts: 'dangerously' });
+    code = dom.window.document.getElementById('bml').href;
+    dom.window.close();
+  } else code = fs.readFileSync(build, 'utf8');
+  return build === 'transcript.js' ? code : decodeURIComponent(new URL(code).href.slice('javascript:'.length));
+}
 async function run(build, { href, players = [], files, language = 'en', media, vtt }) {
   const requests = [], alerts = [], copied = [];
-  await vm.runInNewContext(fs.readFileSync(build, 'utf8'), {
+  const dom = new JSDOM('<!doctype html><html lang="' + language + '"><body>' + players.join('') + '</body></html>');
+  await vm.runInNewContext(executable(build), {
     URL, URLSearchParams,
     location: { href: href || 'https://wol.jw.org/en/wol/bibledocument/r1/lp-e/nwtsty/9/introduction' },
-    document: {
-      documentElement: { lang: language, innerHTML: '' },
-      querySelector: () => null,
-      querySelectorAll: selector => selector === '[data-video], video[data-json-src]' ? players : []
-    },
+    document: dom.window.document,
     navigator: { clipboard: { writeText: async text => copied.push(text) } },
     alert: text => alerts.push(text),
     fetch: async url => {
@@ -29,11 +41,17 @@ async function run(build, { href, players = [], files, language = 'en', media, v
       };
     }
   });
+  dom.window.close();
   return { requests, alerts, copied };
 }
-for (const build of ['transcript.js', 'bookmarklet.js']) {
+for (const build of ['transcript.js', 'bookmarklet.js', 'installed bookmark']) {
   test(`${build}: WOL video copies sentence-formatted subtitles`, async () => {
     const result = await run(build, { players: [player({ 'data-json-src': wolSource })] });
+    assert.match(result.requests[0], /\/E\/pub-nwtsv_90_VIDEO\?/);
+    assert.equal(result.copied[0], 'Introduction to 1 Samuel\n\nFirst sentence.\nSecond sentence.');
+  });
+  test(`${build}: loaded WOL player retains metadata on a div`, async () => {
+    const result = await run(build, { players: [player({ 'data-json-src': wolSource, class: 'videoModal embeddedVideo videoPlayerHolder' }, 'E', 'div')] });
     assert.match(result.requests[0], /\/E\/pub-nwtsv_90_VIDEO\?/);
     assert.equal(result.copied[0], 'Introduction to 1 Samuel\n\nFirst sentence.\nSecond sentence.');
   });

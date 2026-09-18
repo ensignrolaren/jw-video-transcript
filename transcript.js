@@ -25,8 +25,9 @@ javascript:(async () => {
 
   // Fallback 1: embedded players on jw.org and Watchtower ONLINE LIBRARY.
   // WOL uses data-json-src="/wol/vidlink/r1/lp-e?pub=nwtsv&track=090".
+  // The player moves this attribute from <video> to a <div> after loading.
   if (!lank) {
-    for (const dv of document.querySelectorAll('[data-video], video[data-json-src]')) {
+    for (const dv of document.querySelectorAll('[data-video], [data-json-src]')) {
       const src = dv.getAttribute('data-video') || dv.getAttribute('data-json-src') || '';
       const q = new URLSearchParams(src.split('?')[1] || '');
       const pub = q.get('pub'), docid = q.get('docid'), track = q.get('track');
